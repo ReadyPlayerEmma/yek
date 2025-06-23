@@ -358,6 +358,15 @@ impl YekConfig {
             return Err(anyhow!("tree_header and tree_only cannot both be enabled"));
         }
 
+        // Validate JSON output is not used with tree modes
+        if self.json && self.tree_header {
+            return Err(anyhow!("JSON output not supported with tree header mode"));
+        }
+
+        if self.json && self.tree_only {
+            return Err(anyhow!("JSON output not supported in tree-only mode"));
+        }
+
         Ok(())
     }
 }

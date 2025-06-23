@@ -164,12 +164,22 @@ mod tree_tests {
         let mut cmd = Command::cargo_bin("yek").unwrap();
         cmd.arg("--tree-header").arg("--json").arg(temp_dir.path());
 
-        cmd.assert()
-            .success()
-            .stdout(predicate::str::contains("Directory structure:"))
-            .stdout(predicate::str::contains("└── test.rs"))
-            .stdout(predicate::str::contains("\"filename\""))
-            .stdout(predicate::str::contains("\"content\""));
+        cmd.assert().failure().stderr(predicate::str::contains(
+            "JSON output not supported with tree header mode",
+        ));
+    }
+
+    #[test]
+    fn test_tree_only_with_json_output() {
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(temp_dir.path().join("test.rs"), "content").unwrap();
+
+        let mut cmd = Command::cargo_bin("yek").unwrap();
+        cmd.arg("--tree-only").arg("--json").arg(temp_dir.path());
+
+        cmd.assert().failure().stderr(predicate::str::contains(
+            "JSON output not supported in tree-only mode",
+        ));
     }
 
     #[test]
