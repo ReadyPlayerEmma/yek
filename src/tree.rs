@@ -53,30 +53,28 @@ impl TreeNode {
 }
 
 fn add_path_to_tree(root: &mut TreeNode, path: &Path) {
-    let components: Vec<_> = path.components().collect();
-    if components.is_empty() {
-        return;
-    }
-
+    let mut components = path.components().peekable();
     let mut current = root;
 
     // Process all components except the last one as directories
-    for component in &components[..components.len().saturating_sub(1)] {
+    while let Some(component) = components.next() {
+        let is_last = components.peek().is_none();
         let name = component.as_os_str().to_string_lossy().to_string();
-        current = current
-            .children
-            .entry(name.clone())
-            .or_insert_with(|| TreeNode::new_with_name(name, false));
-    }
 
-    // Add the final component (file or directory)
-    if let Some(last_component) = components.last() {
-        let name = last_component.as_os_str().to_string_lossy().to_string();
-        let is_file = path.is_file() || path.extension().is_some();
-        current
-            .children
-            .entry(name.clone())
-            .or_insert_with(|| TreeNode::new_with_name(name, is_file));
+        if is_last {
+            // Add the final component (file or directory)
+            let is_file = path.is_file() || path.extension().is_some();
+            current
+                .children
+                .entry(name.clone())
+                .or_insert_with(|| TreeNode::new_with_name(name, is_file));
+        } else {
+            // Process as directory
+            current = current
+                .children
+                .entry(name.clone())
+                .or_insert_with(|| TreeNode::new_with_name(name, false));
+        }
     }
 }
 
