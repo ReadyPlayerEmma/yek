@@ -78,6 +78,18 @@ fn test_validate_config_invalid_ignore_pattern() {
 }
 
 #[test]
+fn test_validate_config_tree_header_mutual_exclusivity() {
+    let mut config = YekConfig::extend_config_with_defaults(vec![], "/tmp/yek".to_string());
+    config.tree_header = true;
+    config.tree_only = true;
+
+    let result = config.validate();
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("tree_header and tree_only cannot both be enabled"));
+}
+
+#[test]
 fn test_validate_invalid_output_template() {
     let cfg = YekConfig {
         output_template: ">>>> FILE_PATH\n".to_string(),
