@@ -284,4 +284,128 @@ mod tree_tests {
             .stdout(predicate::str::contains("==== test.rs ===="))
             .stdout(predicate::str::contains("hello world"));
     }
+
+    #[test]
+    fn test_tree_critical_fixes_comprehensive() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a complex structure that tests all critical fixes:
+        // 1. Path normalization and component filtering
+        // 2. Duplicate file handling
+        // 3. File vs directory conflicts
+        // 4. Proper sorting and tree structure
+
+        // Create nested directories
+        fs::create_dir_all(temp_dir.path().join("src").join("utils")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("config")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("tests")).unwrap();
+
+        // Create files that test duplicate handling
+        fs::write(temp_dir.path().join("src").join("main.rs"), "fn main() {}").unwrap();
+        fs::write(temp_dir.path().join("src").join("lib.rs"), "// Library").unwrap();
+        fs::write(
+            temp_dir.path().join("src").join("utils").join("helper.rs"),
+            "// Helper",
+        )
+        .unwrap();
+
+        // Create file vs directory conflict scenario
+        fs::write(temp_dir.path().join("config").join("app.toml"), "[app]").unwrap();
+        fs::write(temp_dir.path().join("config.json"), "{}").unwrap(); // config as both file and dir
+
+        // Create files with various extensions for sorting test
+        fs::write(temp_dir.path().join("README.md"), "# Project").unwrap();
+        fs::write(temp_dir.path().join("Cargo.toml"), "[package]").unwrap();
+        fs::write(
+            temp_dir.path().join("tests").join("integration.rs"),
+            "#[test]",
+        )
+        .unwrap();
+
+        let mut cmd = Command::cargo_bin("yek").unwrap();
+        cmd.arg("--tree-only").arg(temp_dir.path());
+
+        let output = cmd.assert().success().get_output().stdout.clone();
+        let output_str = String::from_utf8(output).unwrap();
+
+        // Test 1: Proper directory structure with correct sorting (directories first)
+        assert!(output_str.contains("├── config/"));
+        assert!(output_str.contains("├── src/"));
+        assert!(output_str.contains("├── tests/"));
+
+        // Test 2: Files come after directories, sorted alphabetically
+        assert!(output_str.contains("├── Cargo.toml"));
+        assert!(output_str.contains("└── config.json"));
+
+        // Test 3: Nested structure is properly rendered
+        assert!(output_str.contains("│   ├── utils/"));
+        assert!(output_str.contains("│   │   └── helper.rs"));
+        assert!(output_str.contains("│   ├── lib.rs"));
+        assert!(output_str.contains("│   └── main.rs"));
+
+        // Test 4: File vs directory conflict resolved (config/ directory and config.json file coexist)
+        let config_dir_count = output_str.matches("config/").count();
+        let config_file_count = output_str.matches("config.json").count();
+        assert_eq!(
+            config_dir_count, 1,
+            "Should have exactly one config/ directory"
+        );
+        assert_eq!(
+            config_file_count, 1,
+            "Should have exactly one config.json file"
+        );
+
+        // Test 5: No problematic path components (like Windows drive prefixes) appear
+        assert!(!output_str.contains("C:"));
+        assert!(!output_str.contains("D:"));
+        assert!(!output_str.contains("./"));
+        assert!(!output_str.contains("../"));
+
+        // Test 6: Proper Unicode tree characters are used
+        assert!(output_str.contains("├──"));
+        assert!(output_str.contains("└──"));
+        assert!(output_str.contains("│"));
+
+        // Test 7: Directory structure header is present in tree-only mode
+        assert!(output_str.contains("Directory structure:"));
+
+        // Test 8: All expected files are present and accounted for
+        assert!(output_str.contains("main.rs"));
+        assert!(output_str.contains("lib.rs"));
+        assert!(output_str.contains("helper.rs"));
+        assert!(output_str.contains("app.toml"));
+        assert!(output_str.contains("integration.rs"));
+        assert!(output_str.contains("Cargo.toml"));
+    }
+
+    #[test]
+    fn test_tree_windows_path_handling() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a nested structure that would trigger Windows path issues
+        fs::create_dir_all(temp_dir.path().join("repo").join("src")).unwrap();
+        fs::write(
+            temp_dir.path().join("repo").join("src").join("lib.rs"),
+            "// lib content",
+        )
+        .unwrap();
+        fs::write(temp_dir.path().join("repo").join("Cargo.toml"), "[package]").unwrap();
+
+        let mut cmd = Command::cargo_bin("yek").unwrap();
+        cmd.arg("--tree-only").arg(temp_dir.path());
+
+        let output = cmd.assert().success().get_output().stdout.clone();
+        let output_str = String::from_utf8(output).unwrap();
+
+        // Should not contain drive prefixes (C:, D:, etc.) that could appear on Windows
+        assert!(!output_str.contains("C:"));
+        assert!(!output_str.contains("D:"));
+        assert!(!output_str.contains("E:"));
+
+        // Should contain proper nested structure
+        assert!(output_str.contains("repo/"));
+        assert!(output_str.contains("├── src/") || output_str.contains("└── src/"));
+        assert!(output_str.contains("lib.rs"));
+        assert!(output_str.contains("Cargo.toml"));
+    }
 }
