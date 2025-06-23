@@ -78,6 +78,45 @@ fn add_path_to_tree(root: &mut TreeNode, path: &Path) {
     }
 }
 
+fn render_child(
+    child: &TreeNode,
+    output: &mut String,
+    current_prefix: &str,
+    is_last: bool,
+    is_root: bool,
+) {
+    // Add current prefix (empty for root)
+    if !is_root {
+        output.push_str(current_prefix);
+    }
+
+    // Add tree symbols
+    let child_prefix = if is_last { "└── " } else { "├── " };
+    output.push_str(child_prefix);
+    output.push_str(&child.name);
+
+    // Add '/' for directories
+    if !child.is_file {
+        output.push('/');
+    }
+    output.push('\n');
+
+    // Calculate next prefix for children
+    let next_prefix = if is_root {
+        // For root children, use simple prefix
+        if is_last { "    " } else { "│   " }.to_string()
+    } else {
+        // For non-root children, extend current prefix
+        let mut next = String::with_capacity(current_prefix.len() + 4);
+        next.push_str(current_prefix);
+        next.push_str(if is_last { "    " } else { "│   " });
+        next
+    };
+
+    // Recursively render this child's children
+    render_tree(child, output, &next_prefix, false);
+}
+
 fn render_tree(node: &TreeNode, output: &mut String, prefix: &str, is_root: bool) {
     // Sort children: directories first, then files, both alphabetically
     let mut children: Vec<_> = node.children.values().collect();
@@ -90,41 +129,10 @@ fn render_tree(node: &TreeNode, output: &mut String, prefix: &str, is_root: bool
         }
     });
 
-    if is_root {
-        // For root, just render children
-        for (i, child) in children.iter().enumerate() {
-            let is_last = i == children.len() - 1;
-            let child_prefix = if is_last { "└── " } else { "├── " };
-            output.push_str(child_prefix);
-            output.push_str(&child.name);
-            if !child.is_file {
-                output.push('/');
-            }
-            output.push('\n');
-
-            // Render children with appropriate prefix
-            let next_prefix = if is_last { "    " } else { "│   " };
-            render_tree(child, output, next_prefix, false);
-        }
-    } else {
-        // For non-root nodes, render children with current prefix
-        for (i, child) in children.iter().enumerate() {
-            let is_last = i == children.len() - 1;
-            output.push_str(prefix);
-            let child_prefix = if is_last { "└── " } else { "├── " };
-            output.push_str(child_prefix);
-            output.push_str(&child.name);
-            if !child.is_file {
-                output.push('/');
-            }
-            output.push('\n');
-
-            // Render children with extended prefix
-            let mut next_prefix = String::with_capacity(prefix.len() + 4);
-            next_prefix.push_str(prefix);
-            next_prefix.push_str(if is_last { "    " } else { "│   " });
-            render_tree(child, output, &next_prefix, false);
-        }
+    // Render each child using the helper function
+    for (i, child) in children.iter().enumerate() {
+        let is_last = i == children.len() - 1;
+        render_child(child, output, prefix, is_last, is_root);
     }
 }
 
